@@ -1,0 +1,14 @@
+version: "4.0"
+services:
+  postgres:
+    image: postgres:latest
+    container_name: VENTAFLASH
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    ports:
+      - "6431:5432"
