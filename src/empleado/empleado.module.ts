@@ -16,10 +16,11 @@ import { Plane } from 'src/planes/entities/plane.entity';
 import { PlanVigencia } from 'src/plan-vigencia/entities/plan-vigencia.entity';
 import { Pago } from 'src/pagos/entities/pago.entity';
 import { PagosService } from 'src/pagos/pagos.service';
+import { Caja } from 'src/cajas/entities/caja.entity';
 
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Empleado, Empresa, User, Perfil, Modulo, Estatus, Plane, PlanVigencia, Pago, ])],
+  imports: [TypeOrmModule.forFeature([Empleado, Empresa, User, Perfil, Modulo, Estatus, Plane, PlanVigencia, Pago, Caja ])],
   controllers: [EmpleadoController],
   providers: [EmpleadoService, EmpresaService, UsersService, PerfilService, EstatusService, PagosService,],
   exports: [EmpleadoService]

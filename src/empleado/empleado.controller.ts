@@ -19,22 +19,10 @@ export class EmpleadoController {
     return this.empleadoService.create(createEmpleadoDto, user);
   }
 
-  @Auth(Role.SOPORTE)
-  @Post('soporte')
-  createEmpleadoSoporte(@Body() createEmpleadoDto: CreateEmpleadoDto, @ActiveUser() user: UserActiveInterface) {
-    return this.empleadoService.createEmpleadoSoporte(createEmpleadoDto, user);
-  }
-
   
   @Get()
   findAll( @ActiveUser() user: UserActiveInterface) {
     return this.empleadoService.findAll(user);
-  }
-
- 
-  @Get('yo')
-  miUsuario( @ActiveUser() user: UserActiveInterface) {
-    return this.empleadoService.miUsuario(user);
   }
 
 

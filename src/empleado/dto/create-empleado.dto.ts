@@ -18,6 +18,12 @@ import {
     @IsOptional()
     @IsInt()
     id_empresa?: number;
+
+
+    @ApiProperty()
+    @IsOptional()
+    @IsInt()
+    id_caja?: number;
   
     @ApiProperty()
     @IsInt()

@@ -3,7 +3,7 @@ import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Empleado } from './entities/empleado.entity';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { UserActiveInterface } from 'src/common/interfaces/user-active.interface';
 import { Empresa } from 'src/empresa/entities/empresa.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -12,6 +12,7 @@ import { Estatus } from 'src/estatus/entities/estatus.entity';
 import * as bcrypt from 'bcryptjs';
 import { Role } from 'src/common/enums/rol.enum';
 import e from 'express';
+import { Caja } from 'src/cajas/entities/caja.entity';
 
 @Injectable()
 export class EmpleadoService {
@@ -25,256 +26,201 @@ export class EmpleadoService {
     private readonly perfilRepository: Repository<Perfil>,
     @InjectRepository(Estatus)
     private readonly estatusRepository: Repository<Estatus>,
+    @InjectRepository(Caja) private readonly cajaRepository: Repository<Caja>
   ) {}
   async create(
-    createEmpleadoDto: CreateEmpleadoDto,
-    user: UserActiveInterface,
-  ) {
-    // Validar empresa según el rol
-    let empresa: Empresa;
-    if (user.role === Role.SOPORTE) {
-      if (!createEmpleadoDto.id_empresa) {
-        throw new BadRequestException(
-          'El id de la empresa es requerido en el perfil de soporte',
-        );
-      }
-      empresa = await this.empresaRepository.findOne({
-        where: { id_empresa: createEmpleadoDto.id_empresa },
-      });
-    } else {
-      empresa = await this.empresaRepository.findOne({
-        where: { id_empresa: user.id_empresa },
-      });
-    }
-  
-    if (!empresa) {
-      throw new BadRequestException('Empresa no encontrada');
-    }
-  
-    // Validar perfil según el rol
-    let perfil;
-    if (user.role === Role.SOPORTE) {
-      if (!createEmpleadoDto.id_perfil) {
-        throw new BadRequestException(
-          'El id del perfil es requerido en el perfil de soporte',
-        );
-      }
-      perfil = await this.perfilRepository.findOne({
-        where: {
-          id_perfil: createEmpleadoDto.id_perfil,
-          empresa: { id_empresa: createEmpleadoDto.id_empresa },
-        },
-      });
-    } else {
-      perfil = await this.perfilRepository.findOne({
-        where: {
-          id_perfil: createEmpleadoDto.id_perfil,
-          empresa: { id_empresa: user.id_empresa },
-        },
-      });
-    }
-  
-    if (!perfil) {
-      throw new BadRequestException('El perfil no existe');
-    }
-  
-    // Validar estatus
-    const estatus = await this.estatusRepository.findOneBy({
-      id_estatus: createEmpleadoDto.id_estatus,
-    });
-    if (!estatus) {
-      throw new BadRequestException('El estatus no existe');
-    }
-  
-    // Validaciones condicionales
-    let usuario = null;
-  
-    if (!createEmpleadoDto.aplicaEnUsuario && createEmpleadoDto.email) {
+  createEmpleadoDto: CreateEmpleadoDto,
+  user: UserActiveInterface,
+) {
+ 
+  let empresa: Empresa;
+  if (user.role === Role.SOPORTE) {
+    if (!createEmpleadoDto.id_empresa) {
       throw new BadRequestException(
-        'El campo email no debe ser enviado si "aplicaEnUsuario" es falso',
+        'El id de la empresa es requerido en el perfil de soporte',
       );
     }
-  
-    if (createEmpleadoDto.aplicaEnUsuario) {
-      if (!createEmpleadoDto.email || !createEmpleadoDto.nbNombres || !createEmpleadoDto.pwdPassword) {
-        throw new BadRequestException(
-          'Se requiere email, nombre y contraseña si aplicaEnUsuario es verdadero',
-        );
-      }
-  
-      // ✅ VALIDACIÓN CORREGIDA: Verificar que el email NO exista en la tabla de usuarios
-      const usuarioExistente = await this.userRepository.findOneBy({
-        email: createEmpleadoDto.email,
-      });
-
-     
-  
-      if (usuarioExistente) {
-        throw new BadRequestException('Ya existe un usuario con ese email');
-      }
-  
-      // ✅ Crear el nuevo usuario solo si NO existe
-      const hashedPassword = await bcrypt.hash(createEmpleadoDto.pwdPassword, 10);
-      usuario = this.userRepository.create({
-        nbNombres: createEmpleadoDto.nbNombres,
-        email: createEmpleadoDto.email,
-        pwdPassword: hashedPassword,
-        empresa,
-        role: Role.EMPLEADO,
-      });
-  
-      usuario = await this.userRepository.save(usuario);
-  
-      // ✅ Validar que no exista un empleado con ese email (solo si aplicaEnUsuario)
-      const existingEmpleadoEmail = await this.empleadoRepository.findOne({
-        where: {
-          email: createEmpleadoDto.email,
-          empresa: { id_empresa: empresa.id_empresa },
-        },
-      });
-  
-      if (existingEmpleadoEmail) {
-        throw new BadRequestException('Ya existe un empleado con ese email para esta empresa');
-      }
-    }
-  
-    // ✅ VALIDACIONES DE UNICIDAD GLOBALES (no solo por empresa)
-  
-    // Validar que el email sea único en toda la tabla de empleados (global)
-    if (createEmpleadoDto.email) {
-      const existingEmpleadoEmailGlobal = await this.empleadoRepository.findOne({
-        where: {
-          email: createEmpleadoDto.email,
-        },
-      });
-  
-      if (existingEmpleadoEmailGlobal) {
-        throw new BadRequestException('Ya existe un empleado con ese email');
-      }
-    }
-  
-  
-    // Validar que el email personal sea único en toda la tabla de empleados (global)
-    if (createEmpleadoDto.emailPersonal) {
-      const existingEmpleadoEmailPersonalGlobal = await this.empleadoRepository.findOne({
-        where: {
-          emailPersonal: createEmpleadoDto.emailPersonal,
-        },
-      });
-      if (existingEmpleadoEmailPersonalGlobal) {
-        throw new BadRequestException('Ya existe un empleado con ese email personal');
-      }
-    }
-  
-    // Crear el empleado
-    const empleado = this.empleadoRepository.create({
-      ...createEmpleadoDto,
-      userEmail: user.email,
-      user: usuario,
-      empresa,
-      perfil,
-      estatus,
-      role: user.role,
+    empresa = await this.empresaRepository.findOne({
+      where: { id_empresa: createEmpleadoDto.id_empresa },
     });
-  
-    return await this.empleadoRepository.save(empleado);
+  } else {
+    empresa = await this.empresaRepository.findOne({
+      where: { id_empresa: user.id_empresa },
+    });
   }
-  async createEmpleadoSoporte(createEmpleadoDto: CreateEmpleadoDto, user: UserActiveInterface) {
-    // relacion con la empresa
-    //apartado que valida si el soporte va a insertar un dato le debe pasar
-    //el id de la empresa esto le da el permiso de insertar datos en la db
-   const empresa = await this.empresaRepository.findOne({
-    where: {
-      id_empresa: user.id_empresa
-    }
-   })
 
-    if (!empresa) {
-      throw new BadRequestException('Empresa no encontrada');
-    }
-    // relacion con el perfil
+  if (!empresa) {
+    throw new BadRequestException('Empresa no encontrada');
+  }
 
-    let perfil = await this.perfilRepository.findOne({
+  let perfil;
+  if (user.role === Role.SOPORTE) {
+    if (!createEmpleadoDto.id_perfil) {
+      throw new BadRequestException(
+        'El id del perfil es requerido en el perfil de soporte',
+      );
+    }
+    perfil = await this.perfilRepository.findOne({
+      where: {
+        id_perfil: createEmpleadoDto.id_perfil,
+        empresa: { id_empresa: createEmpleadoDto.id_empresa },
+      },
+    });
+  } else {
+    perfil = await this.perfilRepository.findOne({
       where: {
         id_perfil: createEmpleadoDto.id_perfil,
         empresa: { id_empresa: user.id_empresa },
       },
     });
+  }
 
-    if (!perfil) {
-      throw new BadRequestException('El perfil no existe');
+  if (!perfil) {
+    throw new BadRequestException('El perfil no existe');
+  }
+
+  const estatus = await this.estatusRepository.findOneBy({
+    id_estatus: createEmpleadoDto.id_estatus,
+  });
+  if (!estatus) {
+    throw new BadRequestException('El estatus no existe');
+  }
+
+  let usuario = null;
+  let caja = null;
+
+  if (!createEmpleadoDto.aplicaEnUsuario && createEmpleadoDto.email) {
+    throw new BadRequestException(
+      'El campo email no debe ser enviado si "aplicaEnUsuario" es falso',
+    );
+  }
+
+  if (createEmpleadoDto.aplicaEnUsuario) {
+    if (!createEmpleadoDto.email || !createEmpleadoDto.nbNombres || !createEmpleadoDto.pwdPassword || !createEmpleadoDto.id_caja) {
+      throw new BadRequestException(
+        'Se requiere email, nombre, caja y contraseña si aplicaEnUsuario es verdadero',
+      );
     }
 
-    // relacion con el estatus
-    const estatus = await this.estatusRepository.findOneBy({
-      id_estatus: createEmpleadoDto.id_estatus,
+    caja = await this.cajaRepository.findOne({
+      where: {
+        id_caja: createEmpleadoDto.id_caja,
+        empresa: { id_empresa: user.role === Role.SOPORTE ? createEmpleadoDto.id_empresa : user.id_empresa }
+      }
     });
-    if (!estatus) {
-      throw new BadRequestException('El estatus no existe');
+
+    if (!caja) {
+      throw new BadRequestException('La caja no existe');
     }
 
-    let usuario = await this.userRepository.findOneBy({
+    const cajaOcupada = await this.empleadoRepository.findOne({
+      where: {
+        caja: { id_caja: createEmpleadoDto.id_caja },
+        empresa: { id_empresa: user.role === Role.SOPORTE ? createEmpleadoDto.id_empresa : user.id_empresa },
+        user: Not(IsNull())
+      },
+      relations: ['user', 'caja', 'empresa']
+    });
+
+    if (cajaOcupada) {
+      throw new BadRequestException('La caja ya está ocupada por otro empleado');
+    }
+
+    const usuarioExistente = await this.userRepository.findOneBy({
       email: createEmpleadoDto.email,
     });
 
-    // Si el checkbox "Aplica en Usuario" está marcado y no existe, creamos el usuario
-    if (createEmpleadoDto.aplicaEnUsuario && !usuario) {
-      const hashedPassword = await bcrypt.hash(
-        createEmpleadoDto.pwdPassword,
-        10,
-      ); // Encripta la contraseña
-      usuario = this.userRepository.create({
-        nbNombres: createEmpleadoDto.nbNombres,
-        email: createEmpleadoDto.email,
-        pwdPassword: hashedPassword,
-        empresa: empresa,
-        role: Role.SOPORTE,
-      });
-
-      usuario = await this.userRepository.save(usuario);
+    if (usuarioExistente) {
+      throw new BadRequestException('Ya existe un usuario con ese email');
     }
 
-    const empleado = this.empleadoRepository.create({
-      ...createEmpleadoDto,
-      userEmail: user.email,
-      user: usuario,
-      empresa: empresa,
-      perfil: perfil,
-      estatus: estatus,
-      role: user.role
+    const hashedPassword = await bcrypt.hash(createEmpleadoDto.pwdPassword, 10);
+    usuario = this.userRepository.create({
+      nbNombres: createEmpleadoDto.nbNombres,
+      email: createEmpleadoDto.email,
+      pwdPassword: hashedPassword,
+      empresa,
+      role: Role.EMPLEADO,
     });
 
-    return await this.empleadoRepository.save(empleado);
+    usuario = await this.userRepository.save(usuario);
+    const existingEmpleadoEmail = await this.empleadoRepository.findOne({
+      where: {
+        email: createEmpleadoDto.email,
+        empresa: { id_empresa: empresa.id_empresa },
+      },
+    });
+
+    if (existingEmpleadoEmail) {
+      throw new BadRequestException('Ya existe un empleado con ese email para esta empresa');
+    }
+  } else {
+    if (createEmpleadoDto.id_caja) {
+      caja = await this.cajaRepository.findOne({
+        where: {
+          id_caja: createEmpleadoDto.id_caja,
+          empresa: { id_empresa: user.role === Role.SOPORTE ? createEmpleadoDto.id_empresa : user.id_empresa }
+        }
+      });
+
+      if (!caja) {
+        throw new BadRequestException('La caja no existe');
+      }
+    }
   }
 
+  if (createEmpleadoDto.email) {
+    const existingEmpleadoEmailGlobal = await this.empleadoRepository.findOne({
+      where: {
+        email: createEmpleadoDto.email,
+      },
+    });
+
+    if (existingEmpleadoEmailGlobal) {
+      throw new BadRequestException('Ya existe un empleado con ese email');
+    }
+  }
+  if (createEmpleadoDto.emailPersonal) {
+    const existingEmpleadoEmailPersonalGlobal = await this.empleadoRepository.findOne({
+      where: {
+        emailPersonal: createEmpleadoDto.emailPersonal,
+      },
+    });
+    if (existingEmpleadoEmailPersonalGlobal) {
+      throw new BadRequestException('Ya existe un empleado con ese email personal');
+    }
+  }
+
+  const empleado = this.empleadoRepository.create({
+    ...createEmpleadoDto,
+    userEmail: user.email,
+    user: usuario,
+    empresa,
+    perfil,
+    estatus,
+    role: Role.EMPLEADO,
+    caja
+  });
+
+  return await this.empleadoRepository.save(empleado);
+}
+ 
   async findAll(user: UserActiveInterface) {
    
     if (user.role === Role.SOPORTE) {
-      // SOPORTE ve todos los empleados sin restricción
       return await this.empleadoRepository.find({
         relations: ['empresa', 'user', 'perfil', 'estatus']
       });
     }
-
-    // EMPRESA y EMPLEADO solo ven empleados de su empresa
     return await this.empleadoRepository.find({
       where: { empresa: { id_empresa: user.id_empresa } },
       relations: ['empresa', 'user', 'perfil', 'estatus'],
     });
   }
 
-  async miUsuario(user: UserActiveInterface) {
-    return await this.empleadoRepository.findOne({
-      where: {
-        user: { email: user.email },
-      },
-      relations: ['empresa', 'user', 'perfil', 'estatus', 'perfil.modulo'],
-    });
-  }
 
   async findOne(id: number, user: UserActiveInterface) {
     if (user.role === Role.SOPORTE) {
-      // SOPORTE ve todos los empleados sin restricción
       const empleado = await this.empleadoRepository.findOne({
         where: { id_empleado: id },
         relations: ['empresa', 'user', 'perfil', 'estatus'],
@@ -309,7 +255,7 @@ export class EmpleadoService {
   if (user.role === Role.SOPORTE) {
     empleado = await this.empleadoRepository.findOne({
       where: { id_empleado: id },
-      relations: ['empresa', 'perfil', 'estatus', 'user'],
+      relations: ['empresa', 'perfil', 'estatus', 'user', 'caja'],
     });
   } else {
     empleado = await this.empleadoRepository.findOne({
@@ -317,7 +263,7 @@ export class EmpleadoService {
         id_empleado: id,
         empresa: { id_empresa: user.id_empresa },
       },
-      relations: ['empresa', 'perfil', 'estatus', 'user'],
+      relations: ['empresa', 'perfil', 'estatus', 'user', 'caja'],
     });
   }
 
@@ -348,6 +294,38 @@ export class EmpleadoService {
       throw new BadRequestException('El estatus no existe');
     }
     empleado.estatus = estatus;
+  }
+
+  let nuevaCaja = null;
+  if (updateEmpleadoDto.id_caja) {
+    nuevaCaja = await this.cajaRepository.findOne({
+      where: {
+        id_caja: updateEmpleadoDto.id_caja,
+        empresa: { id_empresa: empleado.empresa.id_empresa }
+      }
+    });
+
+    if (!nuevaCaja) {
+      throw new BadRequestException('La caja no existe');
+    }
+
+    if (!empleado.caja || empleado.caja.id_caja !== updateEmpleadoDto.id_caja) {
+      const cajaOcupada = await this.empleadoRepository.findOne({
+        where: {
+          caja: { id_caja: updateEmpleadoDto.id_caja },
+          empresa: { id_empresa: empleado.empresa.id_empresa },
+          user: Not(IsNull()),
+          id_empleado: Not(id)
+        },
+        relations: ['user', 'caja', 'empresa']
+      });
+
+      if (cajaOcupada) {
+        throw new BadRequestException('La caja ya está ocupada por otro empleado');
+      }
+    }
+
+    empleado.caja = nuevaCaja;
   }
 
   if (updateEmpleadoDto.email) {
@@ -384,6 +362,11 @@ export class EmpleadoService {
   }
 
   if (updateEmpleadoDto.aplicaEnUsuario) {
+
+    if (!updateEmpleadoDto.id_caja && !empleado.caja) {
+      throw new BadRequestException('Se requiere asignar una caja si aplicaEnUsuario es verdadero');
+    }
+
     if (!empleado.user) {
       if (!updateEmpleadoDto.email || !updateEmpleadoDto.pwdPassword || !updateEmpleadoDto.nbNombres) {
         throw new BadRequestException(
@@ -419,6 +402,7 @@ export class EmpleadoService {
 
       empleado.user = await this.userRepository.save(newUser);
     } else {
+    
       if (updateEmpleadoDto.pwdPassword) {
         empleado.user.pwdPassword = await bcrypt.hash(updateEmpleadoDto.pwdPassword, 10);
       }
@@ -449,14 +433,18 @@ export class EmpleadoService {
 
       await this.userRepository.save(empleado.user);
     }
+  } else {
+    if (empleado.aplicaEnUsuario && updateEmpleadoDto.aplicaEnUsuario === false) {
+      empleado.caja = null;
+    }
   }
 
-  const { id_perfil, id_estatus, aplicaEnUsuario, pwdPassword, ...empleadoData } = updateEmpleadoDto;
+
+  const { id_perfil, id_estatus, id_caja, aplicaEnUsuario, pwdPassword, ...empleadoData } = updateEmpleadoDto;
   Object.assign(empleado, empleadoData);
 
   empleado.aplicaEnUsuario = aplicaEnUsuario;
 
-  // ✅ Sincronizar nombre del usuario con el del empleado si cambió el nombre
   if (updateEmpleadoDto.nombre && empleado.user) {
     const existingUserName = await this.userRepository.findOneBy({
       nbNombres: updateEmpleadoDto.nombre,
@@ -503,7 +491,6 @@ export class EmpleadoService {
     return this.empleadoRepository.remove(empleado);
   }
 
-  ///filtro para empleados por empresa del lado de soporte
   async findEmpleadoPorEmpresa(id_empresa: number, user: UserActiveInterface){
     if(user.role !== Role.SOPORTE){
       throw new BadRequestException('Solo los usuarios con perfil de soporte pueden acceder a esta informacion');
@@ -527,7 +514,6 @@ export class EmpleadoService {
     return empleado
   }
 
-  //filtrar por empresa para el soporte pero solo lo que aplican a usuarios
   async findEmpleadoPorEmpresaAplicaEnUsuario(id_empresa: number, user: UserActiveInterface){
     if(user.role !== Role.SOPORTE){
       throw new BadRequestException('Solo los usuarios con el perfil de soporte pueden acceder a esta informacion');
@@ -552,7 +538,6 @@ export class EmpleadoService {
     return empleado
   }
 
-  //filtrar por empresa para el soporte pero solo los que no aplican a usuarios
   async findEmpleadoPorEmpresaNoAplicaEnUsuario(id_empresa: number, user: UserActiveInterface){
     if(user.role !== Role.SOPORTE){
       throw new BadRequestException('Solo los usuarios con el perfil de soporte pueden acceder a esta informacion');
@@ -577,7 +562,6 @@ export class EmpleadoService {
     return empleado
   }
 
-  ///filtrar si aplica en usuario para la empresa
   async findEmpleadoAplicaUsuario(user: UserActiveInterface){
     if(user.role === Role.SOPORTE){
       const empleado = await this.empleadoRepository.find({
@@ -598,7 +582,6 @@ export class EmpleadoService {
     return empleado
   }
 
-  //filtrar si no aplica en usuario para la empresa
   async findEmpleadoNoAplicaUsuario(user: UserActiveInterface){
     const empleado = await this.empleadoRepository.find({
       where:{
@@ -611,7 +594,6 @@ export class EmpleadoService {
     return empleado
   }
 
-  //filtrar soporte por empresa
   async filterSoporteEmployeesPorEmpresa(id_empresa: number, user: UserActiveInterface) {
     if(user.role !== Role.SOPORTE){
       throw new BadRequestException('Solo los usuarios con el perfil de soporte pueden acceder a esta informacion');

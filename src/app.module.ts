@@ -15,6 +15,7 @@ import { PlanVigenciaModule } from './plan-vigencia/plan-vigencia.module';
 import { PagosModule } from './pagos/pagos.module';
 import * as dotenv from 'dotenv';
 import { ConfigModule } from '@nestjs/config';
+import { CajasModule } from './cajas/cajas.module';
 
 
 dotenv.config();
@@ -59,6 +60,9 @@ dotenv.config();
 
     
     forwardRef(() => PagosModule),
+
+    
+    CajasModule,
    
    
     ],

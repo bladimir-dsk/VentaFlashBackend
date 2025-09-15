@@ -11,7 +11,7 @@ import { Auth } from 'src/auth/decorators/auth.decorator';
 import { Role } from 'src/common/enums/rol.enum';
 import { RenovacionPagoDto } from './dto/create-renovacion.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
- // Para parsear el cuerpo de la solicitud
+
 
 
  @ApiBearerAuth('jwt')
@@ -51,14 +51,18 @@ successfulPayment() {
 
 @Post('webhook')
 async handleStripeWebhook(@Req() req: Request, @Res() res: Response) {
-  const sig = req.headers['stripe-signature'];
+   const sig = req.headers['stripe-signature'];
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
+
   let event: Stripe.Event;
 
   try {
-    const rawBody = req['rawBody'];
-    event = this.stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
+    // 👇 usamos el rawBody que guardaste en main.ts
+    event = this.stripe.webhooks.constructEvent(
+      (req as any).rawBody,
+      sig,
+      endpointSecret,
+    );
     console.log(`🔔 Webhook recibido - Tipo: ${event.type} | ID: ${event.id}`);
   } catch (err) {
     console.error('⚠️ Error en la verificación del webhook:', err.message);
@@ -114,9 +118,7 @@ private async handleInvoicePaid(invoice: Stripe.Invoice) {
     await this.pagosService.actualizarPagoEnEmpresa(empresaId, pagoId);
     console.log(`🏢 Empresa ${empresaId} actualizada con nuevo pago ${pagoId}`);
   }
-  // No manejamos creación de empresas aquí para renovaciones
-
-  // 3. Enviar notificación
+ 
   await this.enviarNotificacionPagoExitoso(pagoId);
 }
 
@@ -195,40 +197,5 @@ async getFacturaStripe(@Param('id') id: string, @Res() res: Response) {
   // Redirigir directamente al PDF de la factura
   return res.redirect(invoice.invoice_pdf);
 }
-
-// @Auth(Role.SOPORTE)
-// @Get(':id/factura-sat')
-// async generarFacturaSAT(@Param('id') id: number) {
-//   let pago = await this.pagosService.getPago(Number(id));
-  
-//   if (!pago.factura_sat) {
-//     pago = await this.pagosService.generarFacturaSAT(Number(id));
-//   }
-  
-//   // Aquí deberías implementar la generación del PDF para el SAT
-//   // Esto normalmente lo haría un servicio externo (PAC)
-  
-//   return pago.factura_sat;
-// }
-
-@Auth(Role.SOPORTE)
-@Post(':id/generar-factura-manual')
-async generarFacturaManual(@Param('id') id: string) {
-  try {
-    const invoice = await this.pagosService.generarFacturaStripe(Number(id));
-    return { 
-      success: true,
-      invoiceId: invoice.id,
-      invoicePdf: invoice.invoice_pdf
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-
 
 }
