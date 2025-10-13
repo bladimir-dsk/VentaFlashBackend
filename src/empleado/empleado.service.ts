@@ -180,16 +180,6 @@ export class EmpleadoService {
       throw new BadRequestException('Ya existe un empleado con ese email');
     }
   }
-  if (createEmpleadoDto.emailPersonal) {
-    const existingEmpleadoEmailPersonalGlobal = await this.empleadoRepository.findOne({
-      where: {
-        emailPersonal: createEmpleadoDto.emailPersonal,
-      },
-    });
-    if (existingEmpleadoEmailPersonalGlobal) {
-      throw new BadRequestException('Ya existe un empleado con ese email personal');
-    }
-  }
 
   const empleado = this.empleadoRepository.create({
     ...createEmpleadoDto,
@@ -209,13 +199,39 @@ export class EmpleadoService {
    
     if (user.role === Role.SOPORTE) {
       return await this.empleadoRepository.find({
-        relations: ['empresa', 'user', 'perfil', 'estatus']
+        relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
       });
     }
     return await this.empleadoRepository.find({
       where: { empresa: { id_empresa: user.id_empresa } },
-      relations: ['empresa', 'user', 'perfil', 'estatus'],
+      relations: ['empresa', 'user', 'perfil', 'estatus', 'caja'],
     });
+  }
+
+  //filtro de las cajas disponibles que no estan ocupando por empleados
+  async findCajasDisponibles(user: UserActiveInterface){
+   
+      const todasLasCajas = await this.cajaRepository.find({
+        where: {empresa: {
+          id_empresa: user.id_empresa
+        }},
+        order:{
+          num_caja: 'DESC'
+        }
+      })
+      const cajasOcupadas = await this.empleadoRepository.find({
+        where: {
+          empresa: {id_empresa: user.id_empresa},
+          caja: Not(IsNull())
+        },
+      
+        relations: ['caja']
+      })
+      const idsOcupados = new Set(cajasOcupadas.map(c => c.caja.id_caja))
+      const cajasDisponibles = todasLasCajas.filter(c => !idsOcupados.has(c.id_caja))
+      return cajasDisponibles
+    
+    
   }
 
 
@@ -223,7 +239,7 @@ export class EmpleadoService {
     if (user.role === Role.SOPORTE) {
       const empleado = await this.empleadoRepository.findOne({
         where: { id_empleado: id },
-        relations: ['empresa', 'user', 'perfil', 'estatus'],
+        relations: ['empresa', 'user', 'perfil', 'estatus', 'caja'],
       });
 
       if (!empleado) {
@@ -236,7 +252,7 @@ export class EmpleadoService {
         id_empleado: id,
         empresa: { id_empresa: user.id_empresa },
       },
-      relations: ['empresa', 'user', 'perfil', 'estatus'],
+      relations: ['empresa', 'user', 'perfil', 'estatus', 'caja'],
     });
 
     if (!empleado) {
@@ -348,18 +364,6 @@ export class EmpleadoService {
     }
   }
 
-  if (updateEmpleadoDto.emailPersonal) {
-    const existingEmpleadoEmailPersonalGlobal = await this.empleadoRepository.findOne({
-      where: { emailPersonal: updateEmpleadoDto.emailPersonal },
-    });
-
-    if (
-      existingEmpleadoEmailPersonalGlobal &&
-      existingEmpleadoEmailPersonalGlobal.id_empleado !== id
-    ) {
-      throw new BadRequestException('Ya existe un empleado con ese email personal');
-    }
-  }
 
   if (updateEmpleadoDto.aplicaEnUsuario) {
 
@@ -468,7 +472,7 @@ export class EmpleadoService {
     if(user.role === Role.SOPORTE){
       const empleado = await this.empleadoRepository.findOne({
         where: { id_empleado: id },
-        relations: ['empresa', 'user', 'perfil', 'estatus'],
+        relations: ['empresa', 'user', 'perfil', 'estatus', 'caja'],
       })
 
       if (!empleado) {
@@ -482,7 +486,7 @@ export class EmpleadoService {
         id_empleado: id,
         empresa: { id_empresa: user.id_empresa },
       },
-      relations: ['empresa', 'user', 'perfil', 'estatus'],
+      relations: ['empresa', 'user', 'perfil', 'estatus', 'caja'],
     });
 
     if (!empleado) {
@@ -509,7 +513,7 @@ export class EmpleadoService {
         empresa: {
           id_empresa: id_empresa
         }
-      }, relations: ['empresa','perfil', 'estatus', 'user']
+      }, relations: ['empresa','perfil', 'estatus', 'user', 'caja']
     })
     return empleado
   }
@@ -533,7 +537,7 @@ export class EmpleadoService {
           id_empresa: id_empresa
         },
         aplicaEnUsuario: true
-      }, relations: ['empresa', 'user', 'perfil', 'estatus']
+      }, relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
     })
     return empleado
   }
@@ -557,7 +561,7 @@ export class EmpleadoService {
           id_empresa: id_empresa
         },
         aplicaEnUsuario: false
-      }, relations: ['empresa', 'user', 'perfil', 'estatus']
+      }, relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
     })
     return empleado
   }
@@ -567,7 +571,7 @@ export class EmpleadoService {
       const empleado = await this.empleadoRepository.find({
         where:{
           aplicaEnUsuario: true
-        }, relations: ['empresa', 'user', 'perfil', 'estatus']
+        }, relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
       })
       return empleado 
     }
@@ -577,7 +581,7 @@ export class EmpleadoService {
           id_empresa: user.id_empresa
         }, 
         aplicaEnUsuario: true
-      }, relations: ['empresa', 'user', 'perfil', 'estatus']
+      }, relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
     })
     return empleado
   }
@@ -589,7 +593,7 @@ export class EmpleadoService {
           id_empresa: user.id_empresa
         }, 
         aplicaEnUsuario: false
-      }, relations: ['empresa', 'user', 'perfil', 'estatus']
+      }, relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
     })
     return empleado
   }
@@ -613,7 +617,7 @@ export class EmpleadoService {
           id_empresa: id_empresa
         },
         role: Role.SOPORTE
-      }, relations: ['empresa', 'user', 'perfil', 'estatus']
+      }, relations: ['empresa', 'user', 'perfil', 'estatus', 'caja']
     })
     return empleado
   }

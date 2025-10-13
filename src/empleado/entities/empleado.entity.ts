@@ -18,9 +18,6 @@ export class Empleado {
     @Column({ nullable: true })
     email: string;
 
-    @Column({nullable: true})
-    emailPersonal: string;
-
     @Column({nullable: false, default: false})
     aplicaEnUsuario: boolean
 
@@ -47,7 +44,7 @@ export class Empleado {
     @JoinColumn({ name: 'id_estatus', })
     estatus: Estatus;
 
-    @ManyToOne(() => Caja, (caja) => caja.empleado)
+    @OneToOne(() => Caja, (caja) => caja.empleado)
     @JoinColumn({ name: 'id_caja', })
     caja: Caja;
     

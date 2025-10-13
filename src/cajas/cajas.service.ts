@@ -57,11 +57,16 @@ export class CajasService {
   async findAll(user: UserActiveInterface) {
     if(user.role === Role.SOPORTE){
       return this.cajaRepository.find({
-        relations: ['empresa'],
+        relations: ['empresa', 'empleado'],
       });
     }
   
-    return await this.cajaRepository.find()
+    return await this.cajaRepository.find({
+      order: {
+        num_caja: 'DESC'
+      },
+      relations: ['empleado']
+    },)
   }
 
   async findOne(id: number, user: UserActiveInterface) {
@@ -69,7 +74,7 @@ export class CajasService {
       const caja = await this.cajaRepository.findOne({
         where: {
           id_caja: id
-        }, relations: ['empresa']
+        }, relations: ['empresa', 'empleado']
       })
       if(!caja ){
         throw new BadRequestException('Caja no encontrada')
@@ -80,7 +85,7 @@ export class CajasService {
       where: {
         id_caja:id, 
         empresa: {id_empresa: user.id_empresa}
-      }
+      }, relations: ['empresa', 'empleado']
     })
     if(!caja ){
       throw new BadRequestException('Caja no encontrada')
@@ -94,18 +99,29 @@ export class CajasService {
       caja = await this.cajaRepository.findOne({
         where: {
           id_caja: id
-        }, relations: ['empresa']
+        }, relations: ['empresa', 'empleado']
       })
     }else {
       caja = await this.cajaRepository.findOne({
         where: {
           id_caja: id,
           empresa: {id_empresa: user.id_empresa}
-        }
+        }, relations: ['empresa', 'empleado']
       })
     }
     if(!caja ){
       throw new BadRequestException('Caja no encontrada')
+    } 
+
+    ///validar si ya existe una caja con ese numero
+    const existingCaja = await this.cajaRepository.findOne({
+      where: {
+        num_caja: updateCajaDto.num_caja,
+        empresa: {id_empresa: caja.empresa.id_empresa}
+      }
+    })
+    if (existingCaja && existingCaja.id_caja !== id) {
+      throw new BadRequestException('Ya existe una caja con ese numero');
     }
    
     Object.assign(caja, updateCajaDto)
@@ -119,7 +135,7 @@ export class CajasService {
       const caja = await this.cajaRepository.findOne({
         where: {
           id_caja:id
-        }, relations: ['empresa']
+        }, relations: ['empresa', 'empleado']
       })
       if(!caja){
         throw new BadRequestException('Caja no encontrada')
@@ -133,7 +149,7 @@ export class CajasService {
       where: {
         id_caja:id,
         empresa: {id_empresa: user.id_empresa}
-      }
+      }, relations: ['empresa', 'empleado']
     })
     if(!caja){
       throw new BadRequestException('Caja no encontrada')

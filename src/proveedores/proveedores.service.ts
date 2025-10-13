@@ -33,7 +33,10 @@ export class ProveedoresService {
     }
   
     const existingProveedore = await this.proveedoreRepository.findOne({
-      where: { nb_proveedor: createProveedoreDto.nb_proveedor, empresa: { id_empresa: empresa.id_empresa } },
+      where: { 
+        nombre: createProveedoreDto.nombre,
+        empresa: {id_empresa: user.role === Role.SOPORTE ? createProveedoreDto.id_empresa : user.id_empresa}
+      },
     });
   
     if (existingProveedore) {
@@ -42,8 +45,8 @@ export class ProveedoresService {
   
     const existingCorreoProveedor = await this.proveedoreRepository.findOne({
       where: {
-        correoProveedor: createProveedoreDto.correoProveedor,
-        empresa: { id_empresa: empresa.id_empresa },
+        email: createProveedoreDto.email,
+        empresa: { id_empresa: user.role === Role.SOPORTE ? createProveedoreDto.id_empresa : user.id_empresa },
       },
     });
   
@@ -54,7 +57,7 @@ export class ProveedoresService {
     const newProveedore = this.proveedoreRepository.create({
       ...createProveedoreDto,
       userEmail: user.email,
-      empresa: empresa,
+      empresa
     });
   
     return this.proveedoreRepository.save(newProveedore);
@@ -113,7 +116,7 @@ export class ProveedoresService {
     }
 
     const existingProveedore = await this.proveedoreRepository.findOne({
-      where: { nb_proveedor: updateProveedoreDto.nb_proveedor, empresa: { id_empresa: proveedore.empresa.id_empresa } },
+      where: { nombre: updateProveedoreDto.nombre, empresa: { id_empresa: proveedore.empresa.id_empresa } },
     })
     if (existingProveedore && existingProveedore.id_proveedor !== id) {
       throw new BadRequestException('Ya existe un proveedor con ese nombre para esta empresa');
@@ -123,7 +126,7 @@ export class ProveedoresService {
 
     const existingCorreoProveedor = await this.proveedoreRepository.findOne({
       where: {
-        correoProveedor: updateProveedoreDto.correoProveedor,
+        email: updateProveedoreDto.email,
         empresa: { id_empresa: proveedore.empresa.id_empresa },
       },
     });

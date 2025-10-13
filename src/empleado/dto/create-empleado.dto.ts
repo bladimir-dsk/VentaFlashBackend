@@ -51,12 +51,6 @@ import {
   
 
     @ApiProperty()
-    @IsOptional()
-    @IsEmail()
-    emailPersonal?: string;
-  
-
-    @ApiProperty()
     @ValidateIf(o => o.aplicaEnUsuario === true)
     @IsString()
     pwdPassword?: string;

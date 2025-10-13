@@ -16,6 +16,7 @@ import { PagosModule } from './pagos/pagos.module';
 import * as dotenv from 'dotenv';
 import { ConfigModule } from '@nestjs/config';
 import { CajasModule } from './cajas/cajas.module';
+import { CategoriaModule } from './categoria/categoria.module';
 
 
 dotenv.config();
@@ -63,6 +64,9 @@ dotenv.config();
 
     
     CajasModule,
+
+    
+    CategoriaModule,
    
    
     ],

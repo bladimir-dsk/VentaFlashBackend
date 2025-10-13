@@ -9,22 +9,16 @@ export class Proveedore {
     id_proveedor: number;
 
     @Column()
-    nb_proveedor: string;
+    nombre: string;
     
     @Column()
-    correoProveedor: string;
+    email: string;
     
     @Column()
-    tel_proveedor: string;
+    telefono: string;
     
     @Column()
-    rfc_proveedor: string;
-    
-    @Column()
-    nb_comercial: string;
-    
-    @Column()
-    codigoPostal: string;
+    empresa_proveedor: string;
 
     @ManyToOne(() => User, (user) => user.email,)
     @JoinColumn({name: 'userEmail', referencedColumnName: 'email', })

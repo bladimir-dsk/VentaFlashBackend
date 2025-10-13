@@ -25,6 +25,11 @@ export class EmpleadoController {
     return this.empleadoService.findAll(user);
   }
 
+  @Get('cajas-disponibles')
+  findCajasDisponibles( @ActiveUser() user: UserActiveInterface) {
+    return this.empleadoService.findCajasDisponibles(user);
+  }
+
 
   @Get(':id')
   findOne(@Param('id') id: number, @ActiveUser() user: UserActiveInterface) {

@@ -1,7 +1,7 @@
 import { Empleado } from "src/empleado/entities/empleado.entity";
 import { Empresa } from "src/empresa/entities/empresa.entity";
 import { User } from "src/users/entities/user.entity";
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm"
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm"
 
 
 @Entity()
@@ -36,6 +36,6 @@ export class Caja {
     @JoinColumn({name: 'id_empresa'})
     empresa: Empresa;
 
-    @OneToMany(() => Empleado, (empleado) => empleado.caja)
-    empleado: Empleado[]
+    @OneToOne(() => Empleado, (empleado) => empleado.caja)
+    empleado: Empleado;
 }

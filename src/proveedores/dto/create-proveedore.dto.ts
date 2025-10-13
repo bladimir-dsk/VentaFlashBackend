@@ -6,27 +6,20 @@ export class CreateProveedoreDto {
 
     @ApiProperty()
     @IsString()
-    nb_proveedor: string
+    nombre: string
 
     @ApiProperty()
     @IsString()
-    correoProveedor: string
+    email: string
+
+    @ApiProperty()
+    @IsOptional()
+    @IsString()
+    telefono: string;
 
     @ApiProperty()
     @IsString()
-    tel_proveedor: string
-
-    @ApiProperty()
-    @IsString()
-    rfc_proveedor: string
-
-    @ApiProperty()
-    @IsString()
-    nb_comercial: string
-
-    @ApiProperty()
-    @IsString()
-    codigoPostal: string
+    empresa_proveedor: string;
 
     @ApiProperty()
     @IsInt()
